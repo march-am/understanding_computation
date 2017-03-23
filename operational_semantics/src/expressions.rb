@@ -15,6 +15,10 @@ class Number < Struct.new(:value)
   def reducible?
     false
   end
+
+  def evaluate(environment)
+    self
+  end
 end
 
 
@@ -37,6 +41,10 @@ class Add < Struct.new(:left, :right)
     else
       Number.new(left.value + right.value)
     end
+  end
+
+  def evaluate(environment)
+    Number.new(left.evaluate(environment).value + right.evaluate(environment).value)
   end
 end
 
@@ -62,6 +70,10 @@ class Multiply < Struct.new(:left, :right)
       Number.new(left.value * right.value)
     end
   end
+
+  def evaluate(environment)
+    Number.new(left.evaluate(environment).value * right.evaluate(environment).value)
+  end
 end
 
 
@@ -74,6 +86,10 @@ class Boolean < Struct.new(:value)
 
   def reducible?
     false
+  end
+
+  def evaluate(environment)
+    self
   end
 end
 
@@ -98,6 +114,10 @@ class LessThan < Struct.new(:left, :right)
       Boolean.new(left.value < right.value)
     end
   end
+
+  def evaluate(environment)
+    Boolean.new(left.evaluate(environment).value < right.evaluate(environment).value)
+  end
 end
 
 
@@ -115,25 +135,14 @@ class Variable < Struct.new(:name)
   def reduce(environment)
     environment[name]
   end
-end
 
-
-class Machine < Struct.new(:expression, :environment)
-
-  def step
-    self.expression = expression.reduce(environment)
-  end
-
-  def run
-    while expression.reducible?
-      puts expression
-      step
-    end
-    puts expression
+  def evaluate(environment)
+    environment[name]
   end
 end
 
 
+# statemant
 class DoNothing
   include Inspectable
 
@@ -147,6 +156,10 @@ class DoNothing
 
   def reducible?
     false
+  end
+
+  def evaluate(environment)
+    environment
   end
 end
 
@@ -168,6 +181,10 @@ class Assign < Struct.new(:name, :expression)
     else
       [DoNothing.new, environment.merge({name => expression})]
     end
+  end
+
+  def evaluate(environment)
+    environment.merge({ name => expression.evaluate(environment) })
   end
 end
 
@@ -194,22 +211,14 @@ class If < Struct.new(:condition, :consequence, :alternative)
       end
     end
   end
-end
 
-
-# can use statement
-class Machine < Struct.new(:statement, :environment)
-
-  def step
-    self.statement, self.environment = statement.reduce(environment)
-  end
-
-  def run
-    while statement.reducible?
-      puts "#{statement}, #{environment}"
-      step
+  def evaluate(environment)
+    case condition.evaluate(environment)
+    when Boolean.new(true)
+      consequence.evaluate(environment)
+    when Boolean.new(false)
+      alternative.evaluate(environment)
     end
-    puts "#{statement}, #{environment}"
   end
 end
 
@@ -234,6 +243,10 @@ class Sequence < Struct.new(:first, :second)
       [Sequence.new(reduced_first, second), reduced_environment]
     end
   end
+
+  def evaluate(environment)
+    second.evaluate(first.evaluate(environment))
+  end
 end
 
 
@@ -251,86 +264,7 @@ class While < Struct.new(:condition, :body)
   def reducible(environment)
     [If.new(condition, Sequence.new(body, self), DoNothing.new), environment]
   end
-end
 
-
-# big step semantics
-class Number
-  def evaluate(environment)
-    self
-  end
-end
-
-
-class Boolean
-  def evaluate(environment)
-    self
-  end
-end
-
-
-class Variable
-  def evaluate(environment)
-    environment[name]
-  end
-end
-
-
-class Add
-  def evaluate(environment)
-    Number.new(left.evaluate(environment).value + right.evaluate(environment).value)
-  end
-end
-
-
-class Multiply
-  def evaluate(environment)
-    Number.new(left.evaluate(environment).value * right.evaluate(environment).value)
-  end
-end
-
-
-class LessThan
-  def evaluate(environment)
-    Boolean.new(left.evaluate(environment).value < right.evaluate(environment).value)
-  end
-end
-
-
-class Assign
-  def evaluate(environment)
-    environment.merge({ name => expression.evaluate(environment) })
-  end
-end
-
-
-class DoNothing
-  def evaluate(environment)
-    environment
-  end
-end
-
-
-class If
-  def evaluate(environment)
-    case condition.evaluate(environment)
-    when Boolean.new(true)
-      consequence.evaluate(environment)
-    when Boolean.new(false)
-      alternative.evaluate(environment)
-    end
-  end
-end
-
-
-class Sequence
-  def evaluate(environment)
-    second.evaluate(first.evaluate(environment))
-  end
-end
-
-
-class While
   def evaluate(environment)
     case condition.evaluate(environment)
     when Boolean.new(true)
@@ -338,6 +272,23 @@ class While
     when Boolean.new(false)
       environment
     end
+  end
+end
+
+
+# can use statement
+class Machine < Struct.new(:statement, :environment)
+
+  def step
+    self.statement, self.environment = statement.reduce(environment)
+  end
+
+  def run
+    while statement.reducible?
+      puts "#{statement}, #{environment}"
+      step
+    end
+    puts "#{statement}, #{environment}"
   end
 end
 
