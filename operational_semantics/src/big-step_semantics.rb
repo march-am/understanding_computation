@@ -162,3 +162,23 @@ class While < Struct.new(:condition, :body)
     end
   end
 end
+
+# Tail Call Optimization
+
+RubyVM::InstructionSequence.compile_option = {
+  :tailcall_optimization => true,
+  :trace_instruction => false
+}
+
+RubyVM::InstructionSequence.new(<<-EOF).eval
+  class While_with_tco < While
+    def evaluate(environment)
+      case condition.evaluate(environment)
+      when Boolean.new(true)
+        evaluate(body.evaluate(environment))
+      when Boolean.new(false)
+        environment
+      end
+    end
+  end
+EOF
